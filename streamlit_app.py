@@ -1,12 +1,14 @@
 import os
 import time
 import streamlit as st
-
+from datetime import date, datetime
 
 class Finder:
-    def __init__(self, search_directory=None, file_type='*'):
+    def __init__(self, search_directory=None, file_type='*', date_from=None, date_to = None):
         self.search_directory = search_directory
         self.file_type = file_type
+        self.date_from = date_from
+        self.date_to = date_to
         self.indexed_files = self._index_files()
 
     def _index_files(self):
@@ -22,9 +24,14 @@ class Finder:
                     if self.file_type == '*' or self.file_type == '' or file.endswith(f'.{self.file_type}'):
                         file_path = os.path.join(root, file)
                         try:
-                            files_list.append(file_path)
+                            creation_time = datetime.fromtimestamp(os.path.getctime(file_path))
+
+                            if self.date_from is None or (creation_time >= datetime.combine(self.date_from, datetime.min.time()) and creation_time <= datetime.combine(self.date_to, datetime.max.time())):
+                                files_list.append(file_path)
                         except PermissionError:
                             st.warning(f"Permission denied: {file_path}")
+                        except OSError:
+                            st.warning(f"Error accessing file: {file_path}")
         return files_list
 
     def find(self, filename_substr):
@@ -39,6 +46,8 @@ class Finder:
                 return file.read()
         except PermissionError:
             return f"Permission denied: {file_path}"
+        except UnicodeDecodeError:
+            return "Cannot display content: Unsupported file format or binary file."
 
     def get_file_details(self, file_path):
         try:
@@ -59,12 +68,10 @@ class Finder:
                 'Modification Time': 'Permission denied'
             }
 
-
 def main():
     st.set_page_config(page_title="File Indexer GUI", layout="wide")
 
-    st.title("📂 File Indexer GUI")
-    st.markdown("A simple graphical interface to interact with the file indexer.")
+    st.title("📂 File Indexer and Searcher")
 
     st.sidebar.header("Configuration")
 
@@ -73,16 +80,20 @@ def main():
     find = st.sidebar.text_input("Find (Filename substring)")
     recent = st.sidebar.number_input("Recent (Number of recent files to show)", min_value=0, step=1)
     open_file = st.sidebar.checkbox("Open File")
+    date_from = st.sidebar.date_input("Date From", value=date(2020, 1, 1))
+    date_to = st.sidebar.date_input("Date To")
+    min_size = st.sidebar.number_input("Minimum File Size (bytes)", min_value=0, step=1)
+    max_size = st.sidebar.number_input("Maximum File Size (bytes)", min_value=0, step=1)
 
-    st.sidebar.markdown("### Click below to run the file indexer")
     if st.sidebar.button("Run"):
-        finder = Finder(search_directory=search_directory, file_type=file_type)
+        finder = Finder(search_directory=search_directory, file_type=file_type, date_from=date_from, date_to = date_to)
 
         results = ""
 
         if find:
             found_files = finder.find(find)
             if found_files:
+                results += "Files found with the given substring:\n"
                 for file_path in found_files:
                     details = finder.get_file_details(file_path)
                     results += f"\nFile Path: {details['File Path']}"
@@ -113,11 +124,7 @@ def main():
                 results += "No recent files found to open."
 
         st.markdown("### Results")
-        st.text_area("Results", results, height=400)
-
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("Developed with ❤️ using [Streamlit](https://streamlit.io/)")
-
+        st.text_area("", results, height=400)
 
 if __name__ == "__main__":
     main()
