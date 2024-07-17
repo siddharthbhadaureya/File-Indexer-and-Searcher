@@ -69,7 +69,7 @@ class Finder:
             }
 
 def main():
-    st.set_page_config(page_title="File Indexer GUI", layout="wide")
+    st.set_page_config(page_title="File Indexer and Searcher", layout="wide")
 
     st.title("📂 File Indexer and Searcher")
 
